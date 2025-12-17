@@ -1,0 +1,5 @@
+{
+  "name": "LegalLens - Solution Feasibility Analyzer",
+  "description": "Analyze legal PDF documents against company solutions to determine feasibility, risks, and scope coverage using Gemini 3.0 Pro.",
+  "requestFramePermissions": []
+}
