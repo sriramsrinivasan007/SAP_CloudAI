@@ -1,7 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, ChatMessage, GroundingSource } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Lazy initialization of the Gemini API client to prevent top-level ReferenceErrors 
+ * and ensure it uses the most current environment variables.
+ */
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const fileToGenerativePart = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -19,6 +23,7 @@ const fileToGenerativePart = async (file: File): Promise<string> => {
  * Generates a professional logo for LegalLens.AI.
  */
 export const generateLogo = async (): Promise<string | null> => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -47,6 +52,7 @@ export const generateLogo = async (): Promise<string | null> => {
  * Uses gemini-3-flash-preview with Search Grounding for a very short, informative market overview.
  */
 export const fetchMarketContext = async (companyName: string): Promise<{ text: string, sources: GroundingSource[] }> => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Provide a very short, highly informative bulleted summary (max 3-4 bullets) of ${companyName}'s current market position, core enterprise offerings, and one major recent contract. Be extremely concise.`,
@@ -72,6 +78,7 @@ export const fetchMarketContext = async (companyName: string): Promise<{ text: s
  * Uses gemini-2.5-flash-lite-latest for fast, low-latency follow-up questions.
  */
 export const quickAssistant = async (history: ChatMessage[], query: string): Promise<string> => {
+  const ai = getAI();
   const contents = history.map(msg => ({
     role: msg.role,
     parts: [{ text: msg.text }]
@@ -97,6 +104,7 @@ export const analyzeDocument = async (
   companyName: string,
   marketContext: string
 ): Promise<AnalysisResult> => {
+  const ai = getAI();
   const base64Data = await fileToGenerativePart(file);
 
   const prompt = `
