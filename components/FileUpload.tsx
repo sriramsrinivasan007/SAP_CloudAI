@@ -32,17 +32,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, disabled }
   };
 
   return (
-    <div className="w-full mb-8">
-      <label className="block text-sm font-semibold text-slate-700 mb-2">
-        Upload Legal Document (PDF)
+    <div className="w-full">
+      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+        Tender / Legal Document
       </label>
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         className={`
-          border-2 border-dashed rounded-xl p-8 text-center transition-colors
-          flex flex-col items-center justify-center min-h-[160px]
-          ${disabled ? 'bg-slate-50 border-slate-200 cursor-not-allowed opacity-60' : 'bg-white border-slate-300 hover:border-indigo-500 hover:bg-slate-50 cursor-pointer'}
+          border-2 border-dashed rounded-2xl p-8 text-center transition-all
+          flex flex-col items-center justify-center min-h-[140px]
+          ${disabled ? 'bg-slate-50 border-slate-200 cursor-not-allowed opacity-60' : 'bg-slate-50 border-slate-200 hover:border-indigo-400 hover:bg-white cursor-pointer group'}
         `}
       >
         <input
@@ -54,15 +54,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, disabled }
           id="file-upload"
         />
         <label htmlFor="file-upload" className={disabled ? 'pointer-events-none' : 'cursor-pointer'}>
-          <div className="bg-indigo-100 p-3 rounded-full inline-flex mb-3">
+          <div className="bg-indigo-50 p-3 rounded-xl inline-flex mb-3 group-hover:scale-110 transition-transform">
              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
              </svg>
           </div>
-          <p className="text-slate-700 font-medium">
-            Drag & drop your PDF here, or <span className="text-indigo-600 underline">browse</span>
+          <p className="text-slate-800 font-bold">
+            Drop your PDF or <span className="text-indigo-600">select file</span>
           </p>
-          <p className="text-slate-400 text-xs mt-1">PDF format up to 20MB</p>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">PDF max 20MB</p>
         </label>
       </div>
     </div>

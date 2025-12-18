@@ -1,5 +1,5 @@
 {
-  "name": "LegalLens - Solution Feasibility Analyzer",
-  "description": "Analyze legal PDF documents against company solutions to determine feasibility, risks, and scope coverage using Gemini 3.0 Pro.",
+  "name": "LegalLens.AI - Universal Bid Analyzer",
+  "description": "Cross-reference any company's portfolio against legal or tender documents to assess bid feasibility, alignment, and resource requirements.",
   "requestFramePermissions": []
 }
