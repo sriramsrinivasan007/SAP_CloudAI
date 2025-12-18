@@ -23,55 +23,68 @@ const fileToGenerativePart = async (file: File): Promise<string> => {
  * Generates a professional logo for LegalLens.AI.
  */
 export const generateLogo = async (): Promise<string | null> => {
-  const ai = getAI();
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [
-        {
-          text: 'A professional, minimalist logo for a legal tech company named LegalLens.AI. The logo should incorporate elements of a stylized magnifying glass lens, digital circuit patterns, and a subtle scale of justice. Modern, high-tech aesthetic, white and indigo blue colors, vector style, flat design.',
-        },
-      ],
-    },
-    config: {
-      imageConfig: {
-        aspectRatio: "1:1"
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: 'A professional, minimalist logo for a legal tech company named LegalLens.AI. The logo should incorporate elements of a stylized magnifying glass lens, digital circuit patterns, and a subtle scale of justice. Modern, high-tech aesthetic, white and indigo blue colors, vector style, flat design.',
+          },
+        ],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-  });
-
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
+  } catch (e) {
+    console.error("Logo generation failed", e);
   }
   return null;
 };
 
 /**
- * Uses gemini-3-flash-preview with Search Grounding for a very short, informative market overview.
+ * Uses gemini-3-flash-preview with Search Grounding.
+ * Added try-catch with fallback to ensure the main analysis isn't blocked by search issues.
  */
 export const fetchMarketContext = async (companyName: string): Promise<{ text: string, sources: GroundingSource[] }> => {
-  const ai = getAI();
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Provide a very short, highly informative bulleted summary (max 3-4 bullets) of ${companyName}'s current market position, core enterprise offerings, and one major recent contract. Be extremely concise.`,
-    config: {
-      tools: [{ googleSearch: {} }],
-    },
-  });
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Provide a very short, highly informative bulleted summary (max 3-4 bullets) of ${companyName}'s current market position, core enterprise offerings, and one major recent contract. Be extremely concise.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
 
-  const sources: GroundingSource[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-    ?.map((chunk: any) => ({
-      title: chunk.web?.title || 'Source',
-      uri: chunk.web?.uri || '',
-    }))
-    .filter((s: any) => s.uri) || [];
+    const sources: GroundingSource[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.map((chunk: any) => ({
+        title: chunk.web?.title || 'Source',
+        uri: chunk.web?.uri || '',
+      }))
+      .filter((s: any) => s.uri) || [];
 
-  return {
-    text: response.text || "No market context found.",
-    sources: sources.slice(0, 5), // Top 5 sources
-  };
+    return {
+      text: response.text || `Market overview for ${companyName}.`,
+      sources: sources.slice(0, 5),
+    };
+  } catch (e) {
+    console.warn("Market context search failed or restricted, using fallback context.", e);
+    return {
+      text: `Directly analyzing ${companyName}'s solutions against the provided document.`,
+      sources: []
+    };
+  }
 };
 
 /**
@@ -97,7 +110,7 @@ export const quickAssistant = async (history: ChatMessage[], query: string): Pro
 };
 
 /**
- * Uses gemini-3-pro-preview for deep document analysis with improved effort logic.
+ * Uses gemini-3-pro-preview for deep document analysis.
  */
 export const analyzeDocument = async (
   file: File, 
@@ -118,106 +131,91 @@ export const analyzeDocument = async (
     2. Analyze: Compare these solutions against the attached Legal/Tender document.
     3. Deadline Extraction: Locate the "Bid Close Date", "Submission Deadline", or "Closing Date". 
        - If it refers to another document (e.g., "As per GeM Bid Document"), return that exact phrase.
-       - If not mentioned, return an empty string.
-    4. Eligibility Extraction: Search the document for:
-       - Pre-bid amount / EMD (Earnest Money Deposit) / Bid Security.
-       - Specific Financial requirements (e.g. minimum turnover).
-       ONLY include these if they are explicitly mentioned. 
-       Note: Do not search for Total Cost or Team Size as per current constraints.
-    5. Priority Roadmap: Generate 3-5 "Priority Focus Points" for "${companyName}". 
-       - These points must consider the urgency implied by the bid deadline.
-    6. Evaluate:
-       - Technical Feasibility (0-100%).
-       - Alignment Score (0-100%).
-       - Stakes: High-stakes risks.
-       - Effort Estimation.
-       - Gaps: Identify out-of-scope items and remediation.
+       - If not found or mentioned, return EXACTLY the string "empty".
+    4. Eligibility Extraction: Search the document for EMD/Pre-bid amounts and Financial requirements.
+    5. Priority Roadmap: Generate 3-5 "Priority Focus Points" for "${companyName}".
+    6. Evaluate Feasibility (0-100%), Alignment (0-100%), Stakes, Effort, and Gaps.
 
     RETURN ONLY VALID JSON.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: {
-        parts: [
-          { inlineData: { mimeType: 'application/pdf', data: base64Data } },
-          { text: prompt }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            companyName: { type: Type.STRING },
-            identifiedSolutions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            bidEndDate: { type: Type.STRING, description: "Extracted deadline. Empty string if not found." },
-            eligibility: {
-              type: Type.OBJECT,
-              properties: {
-                preBidAmount: { type: Type.STRING },
-                financialRequirements: { type: Type.STRING }
-              }
-            },
-            feasibilityScore: { type: Type.NUMBER },
-            alignmentScore: { type: Type.NUMBER },
-            feasibilityReasoning: { type: Type.STRING },
-            stakes: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  severity: { type: Type.STRING, enum: ["High", "Medium", "Low"] }
-                },
-                required: ["title", "description", "severity"]
-              }
-            },
-            priorityFocusPoints: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  urgency: { type: Type.STRING, enum: ["Critical", "High", "Standard"] }
-                },
-                required: ["title", "description", "urgency"]
-              }
-            },
-            inScope: { type: Type.ARRAY, items: { type: Type.STRING } },
-            outOfScope: {
-              type: Type.ARRAY,
-              items: { 
-                type: Type.OBJECT,
-                properties: {
-                  point: { type: Type.STRING },
-                  remediation: { type: Type.STRING }
-                },
-                required: ["point", "remediation"]
-              }
-            },
-            effortEstimation: {
-              type: Type.OBJECT,
-              properties: {
-                employees: { type: Type.NUMBER },
-                durationMonths: { type: Type.NUMBER },
-                description: { type: Type.STRING }
-              },
-              required: ["employees", "durationMonths", "description"]
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: {
+      parts: [
+        { inlineData: { mimeType: 'application/pdf', data: base64Data } },
+        { text: prompt }
+      ]
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          companyName: { type: Type.STRING },
+          identifiedSolutions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          bidEndDate: { type: Type.STRING, description: "Extracted deadline. Use 'empty' if not found." },
+          eligibility: {
+            type: Type.OBJECT,
+            properties: {
+              preBidAmount: { type: Type.STRING },
+              financialRequirements: { type: Type.STRING }
             }
           },
-          required: ["companyName", "identifiedSolutions", "feasibilityScore", "alignmentScore", "feasibilityReasoning", "stakes", "priorityFocusPoints", "inScope", "outOfScope", "effortEstimation"]
-        }
+          feasibilityScore: { type: Type.NUMBER },
+          alignmentScore: { type: Type.NUMBER },
+          feasibilityReasoning: { type: Type.STRING },
+          stakes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                severity: { type: Type.STRING, enum: ["High", "Medium", "Low"] }
+              },
+              required: ["title", "description", "severity"]
+            }
+          },
+          priorityFocusPoints: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                urgency: { type: Type.STRING, enum: ["Critical", "High", "Standard"] }
+              },
+              required: ["title", "description", "urgency"]
+            }
+          },
+          inScope: { type: Type.ARRAY, items: { type: Type.STRING } },
+          outOfScope: {
+            type: Type.ARRAY,
+            items: { 
+              type: Type.OBJECT,
+              properties: {
+                point: { type: Type.STRING },
+                remediation: { type: Type.STRING }
+              },
+              required: ["point", "remediation"]
+            }
+          },
+          effortEstimation: {
+            type: Type.OBJECT,
+            properties: {
+              employees: { type: Type.NUMBER },
+              durationMonths: { type: Type.NUMBER },
+              description: { type: Type.STRING }
+            },
+            required: ["employees", "durationMonths", "description"]
+          }
+        },
+        required: ["companyName", "identifiedSolutions", "feasibilityScore", "alignmentScore", "feasibilityReasoning", "stakes", "priorityFocusPoints", "inScope", "outOfScope", "effortEstimation"]
       }
-    });
+    }
+  });
 
-    if (!response.text) throw new Error("No response text from Gemini");
-    return JSON.parse(response.text) as AnalysisResult;
-  } catch (error) {
-    console.error("Analysis failed:", error);
-    throw error;
-  }
+  if (!response.text) throw new Error("The model returned an empty response. The document might be too complex or blocked by safety filters.");
+  return JSON.parse(response.text) as AnalysisResult;
 };

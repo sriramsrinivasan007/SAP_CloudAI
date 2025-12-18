@@ -33,15 +33,15 @@ const App: React.FC = () => {
 
     setAppState(AppState.ANALYZING);
     setErrorMsg(null);
-    setLoadingStatus('Initializing Search Grounding...');
+    setLoadingStatus('Initializing Market Analysis...');
 
     try {
-      // Step 1: Search Grounding (Gemini 3 Flash)
+      // Step 1: Search Grounding
       const context = await fetchMarketContext(companyName);
       
-      setLoadingStatus(`Analyzing Document for ${companyName}...`);
+      setLoadingStatus(`Reviewing Tender Details for ${companyName}...`);
       
-      // Step 2: Complex Analysis (Gemini 3 Pro)
+      // Step 2: Complex Analysis
       const data = await analyzeDocument(file, companyName, context.text);
       
       setResult({
@@ -52,9 +52,19 @@ const App: React.FC = () => {
       
       setAppState(AppState.SUCCESS);
     } catch (err: any) {
-      console.error(err);
+      console.error("Process error:", err);
       setAppState(AppState.ERROR);
-      setErrorMsg('Analysis failed. The AI couldn\'t process the document or find enough market info.');
+      
+      const rawError = err?.message || 'Unknown processing error';
+      if (rawError.includes('API_KEY')) {
+        setErrorMsg('Authentication Error: API key is missing or invalid in deployment settings.');
+      } else if (rawError.includes('quota')) {
+        setErrorMsg('Rate Limit: Too many requests at once. Please try again in a moment.');
+      } else if (rawError.includes('safety')) {
+        setErrorMsg('Safety Filter: The document content triggered a safety block. Ensure the PDF is a valid tender.');
+      } else {
+        setErrorMsg(`Analysis Failed: ${rawError}. Please ensure the PDF is readable and try a different company name.`);
+      }
     }
   };
 
@@ -101,13 +111,13 @@ const App: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
               </span>
-              Powered by Gemini 3 Pro & Search Grounding
+              Intelligent Bid & Portfolio Verifier
             </div>
             <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">
               Instant Tender Intelligence
             </h2>
             <p className="text-lg text-slate-500 font-medium">
-              We use real-time market data to verify company solutions against your documents. Fast, accurate, and grounded.
+              Validate your enterprise solutions against legal requirements with real-time market grounding and deep document reasoning.
             </p>
           </div>
         )}
@@ -138,7 +148,8 @@ const App: React.FC = () => {
             </div>
 
             {appState === AppState.ERROR && (
-              <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-center text-rose-600 font-bold animate-fade-in">
+              <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 text-center text-rose-600 font-bold animate-fade-in shadow-sm">
+                <p className="mb-2 uppercase text-[10px] tracking-widest opacity-60">System Notification</p>
                 {errorMsg}
               </div>
             )}
@@ -149,7 +160,7 @@ const App: React.FC = () => {
           <div className="fixed inset-0 flex items-center justify-center z-50 bg-slate-50/50 backdrop-blur-sm">
              <div className="bg-white p-10 rounded-3xl shadow-2xl border border-indigo-100 flex flex-col items-center max-w-sm text-center">
                 <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
-                <h3 className="text-2xl font-black text-slate-800 mb-2">Bid Analysis</h3>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Analyzing Bid</h3>
                 <p className="text-slate-400 font-medium text-sm leading-relaxed">{loadingStatus}</p>
              </div>
           </div>
